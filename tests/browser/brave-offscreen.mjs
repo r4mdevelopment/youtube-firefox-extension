@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+const youtubeHost=process.env.YOUTUBE_HOST??'www.youtube.com';assert(['youtube.com','www.youtube.com'].includes(youtubeHost));
 const live=process.env.LIVE_PROBE==='1';const sample=process.env.SAMPLE_ID??'jNQXAC9IVRw';const quality=Number(process.env.QUALITY_HEIGHT)||null;assert.match(sample,/^[\w-]{11}$/);
 const root=resolve('.'), out=resolve('.superpowers/brave-offscreen'+(live?'-live':'')); await mkdir(out,{recursive:true});
 const extension=resolve(out,'extension'); await cp('dist/chromium',extension,{recursive:true});
@@ -56,7 +57,7 @@ try{
  const inspect=()=>evaluate(workerSession,"(async()=>({jobs:(await chrome.storage.local.get('jobs')).jobs??[],tabs:await chrome.tabs.query({}),downloads:await chrome.downloads.search({}),contexts:await chrome.runtime.getContexts({})}))()");
  const newPage=async(url,html)=>{
   const {targetId}=await c.send('Target.createTarget',{url:'about:blank'});const sessionId=await c.attach(targetId);await c.send('Page.enable',{},sessionId);await c.send('Emulation.setDeviceMetricsOverride',{width:1366,height:900,deviceScaleFactor:1,mobile:false},sessionId);
-  if(html){await c.send('Fetch.enable',{patterns:[{urlPattern:'https://www.youtube.com/*',resourceType:'Document'}]},sessionId);c.listeners.push(m=>{if(m.sessionId===sessionId&&m.method==='Fetch.requestPaused')c.send('Fetch.fulfillRequest',{requestId:m.params.requestId,responseCode:200,responseHeaders:[{name:'content-type',value:'text/html'}],body:Buffer.from(html).toString('base64')},sessionId).catch(()=>{});});}
+  if(html){await c.send('Fetch.enable',{patterns:[{urlPattern:'https://'+youtubeHost+'/*',resourceType:'Document'}]},sessionId);c.listeners.push(m=>{if(m.sessionId===sessionId&&m.method==='Fetch.requestPaused')c.send('Fetch.fulfillRequest',{requestId:m.params.requestId,responseCode:200,responseHeaders:[{name:'content-type',value:'text/html'}],body:Buffer.from(html).toString('base64')},sessionId).catch(()=>{});});}
   await c.send('Runtime.enable',{},sessionId);await c.send('Page.navigate',{url},sessionId);return {targetId,sessionId};
  };
  const click=async(page,expression)=>{
@@ -66,13 +67,15 @@ try{
   await c.send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point},page.sessionId);await c.send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point},page.sessionId);
  };
  if(live){
-  const page=await newPage('https://www.youtube.com/watch?v='+sample);
+  const page=await newPage('https://'+youtubeHost+'/watch?v='+sample);
   await until(()=>evaluate(page.sessionId,"!!document.querySelector('video')"),45000);
   await evaluate(page.sessionId,"document.querySelector('video').play().then(()=>true).catch(()=>false)");
   await until(()=>evaluate(page.sessionId,"!!document.querySelector('#ytdl-inline-host')"),30000);
   await click(page,"document.querySelector('#ytdl-inline-host').shadowRoot.querySelector('button')");
   await until(()=>evaluate(page.sessionId,"document.querySelector('#ytdl-quality-host')?.shadowRoot.querySelectorAll('.quality').length"),30000);
   report.realQualities=await evaluate(page.sessionId,"[...document.querySelector('#ytdl-quality-host').shadowRoot.querySelectorAll('.quality')].map(x=>x.textContent)");
+  report.pageUrl=await evaluate(page.sessionId,'location.href');
+  if(process.env.METADATA_ONLY==='1'){report.success=true;console.log(JSON.stringify(report));}else{
   await sleep(6000);report.playback=await evaluate(page.sessionId,"(()=>{const v=document.querySelector('video');return{paused:v.paused,currentTime:v.currentTime,readyState:v.readyState};})()");
   const selected=quality?`[...document.querySelector('#ytdl-quality-host').shadowRoot.querySelectorAll('.quality')].find(e=>e.textContent.startsWith('${quality}p'))`:"document.querySelector('#ytdl-quality-host').shadowRoot.querySelector('.quality')";await click(page,selected);
   await sleep(1200);report.initialJobs=(await inspect()).jobs.map(j=>({state:j.state,error:j.error}));report.inlineStatus=await evaluate(page.sessionId,"document.querySelector('#ytdl-quality-host').shadowRoot.querySelector('[role=status]').textContent");console.log(JSON.stringify({playback:report.playback,jobs:report.initialJobs,inlineStatus:report.inlineStatus}));
@@ -84,8 +87,9 @@ try{
   const decode=spawn(resolve('node_modules/@ffmpeg-installer/win32-x64/ffmpeg.exe'),['-v','error','-i',file.filename,'-f','null','-'],{windowsHide:true,stdio:['ignore','ignore','pipe']});let decodeError='';decode.stderr.on('data',d=>{decodeError+=d;});assert.equal(await new Promise(r=>decode.on('exit',r)),0,decodeError);assert.equal(decodeError,'');report.realIndependentDecode=true;report.sample=sample;report.requestedHeight=quality;
   assert(!state.tabs.some(t=>t.url?.includes('/offscreen/')||t.url?.includes('/runner/')));report.noTaskTab=true;report.success=true;
   console.log(JSON.stringify(report));
+ }
  }else{
- const youtube=await newPage('https://www.youtube.com/watch?v=abcdefghijk','<!doctype html><title>YouTube fixture</title><div id="top-level-buttons-computed" style="margin:40px;display:flex"><button>Like</button></div>');
+ const youtube=await newPage('https://'+youtubeHost+'/watch?v=abcdefghijk','<!doctype html><title>YouTube fixture</title><div id="top-level-buttons-computed" style="margin:40px;display:flex"><button>Like</button></div>');
  const ordinary=await newPage(base+'/progress');
  await until(()=>evaluate(youtube.sessionId,"!!document.querySelector('#ytdl-inline-host')?.shadowRoot.querySelector('button')"));
  await click(youtube,"document.querySelector('#ytdl-inline-host').shadowRoot.querySelector('button')");
@@ -110,7 +114,7 @@ try{
  // Hold four starts in distinct tabs; cancel one while the other three finish.
  held=true;const pages=[];
  for(let i=0;i<4;i++){
-  const page=await newPage('https://www.youtube.com/watch?v=abcdefghijk','<!doctype html><title>Parallel fixture</title><div id="top-level-buttons-computed" style="margin:40px;display:flex"><button>Like</button></div>');pages.push(page);
+  const page=await newPage('https://'+youtubeHost+'/watch?v=abcdefghijk','<!doctype html><title>Parallel fixture</title><div id="top-level-buttons-computed" style="margin:40px;display:flex"><button>Like</button></div>');pages.push(page);
   await until(()=>evaluate(page.sessionId,"!!document.querySelector('#ytdl-inline-host')"));await click(page,"document.querySelector('#ytdl-inline-host').shadowRoot.querySelector('button')");await until(()=>evaluate(page.sessionId,"!!document.querySelector('#ytdl-quality-host')?.shadowRoot.querySelector('.quality')"));await click(page,"document.querySelector('#ytdl-quality-host').shadowRoot.querySelector('.quality')");
  }
  const parallel=await until(async()=>{const s=await inspect();return s.jobs.filter(j=>j.state==='downloading').length===4?s:null;});report.parallelActive=4;

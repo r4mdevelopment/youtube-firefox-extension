@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "YouTube MP4 Downloader",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Download available MP4 streams without re-encoding.",
   "permissions": [
     "downloads",
@@ -9,6 +9,7 @@
     "storage",
     "webRequest",
     "https://www.youtube.com/*",
+    "https://youtube.com/*",
     "https://*.googlevideo.com/*",
     "http://*/*",
     "https://*/*"
@@ -22,7 +23,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.youtube.com/*"
+        "https://www.youtube.com/*",
+        "https://youtube.com/*"
       ],
       "js": [
         "content.js"

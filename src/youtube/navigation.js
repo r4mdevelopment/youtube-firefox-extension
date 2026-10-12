@@ -1,8 +1,9 @@
+import { isYouTubeUrl } from '../common/youtube-url.js';
 export function videoIdFromUrl(href) {
   try {
     const url = new URL(href);
     const id = url.searchParams.get('v');
-    return url.origin === 'https://www.youtube.com' && url.pathname === '/watch' && /^[\w-]{11}$/.test(id ?? '') ? id : null;
+    return isYouTubeUrl(url) && url.pathname === '/watch' && /^[\w-]{11}$/.test(id ?? '') ? id : null;
   } catch { return null; }
 }
 export function createNavigationTracker({ onVideoChanged, env = window }) {

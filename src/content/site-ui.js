@@ -1,3 +1,4 @@
+import { isYouTubeUrl } from '../common/youtube-url.js';
 import { placeQualityMenu } from './menu-placement.js';
 const terminal = new Set(['complete', 'failed', 'cancelled']);
 const labels = { queued: 'Подготовка', downloading: 'Загрузка', retrying: 'Повторная попытка', muxing: 'Объединение', saving: 'Сохранение', complete: 'Скачано ✓', cancelled: 'Отменено', failed: 'Ошибка загрузки' };
@@ -99,7 +100,7 @@ export function createSiteUi({ doc, send }) {
       row.failure.textContent = job.error ? `${job.error.message} (${job.error.code})` : '';progress(row.bars, job.progress);
     }
     const url = new URL(doc.URL);const video = value.video;
-    const onVideo = url.origin === 'https://www.youtube.com' && url.pathname === '/watch';
+    const onVideo = isYouTubeUrl(url) && url.pathname === '/watch';
     const mount = doc.querySelector('ytd-watch-metadata #top-level-buttons-computed, #top-level-buttons-computed');
     if(!onVideo || !mount){ inline.host.remove();setOpen(false);return; }
     if(inline.host.parentElement !== mount) mount.prepend(inline.host);

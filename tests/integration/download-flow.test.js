@@ -160,3 +160,13 @@ it('starts the three-second grace period only after all parallel jobs finish',as
  const read=()=>controller.handle({type:'GET_SITE_VIEW'},content);expect((await read()).jobs).toHaveLength(2);
  releases[1]();await vi.waitFor(()=>expect(controller.manager.get(second.jobId).state).toBe('complete'));clock=52999;expect((await read()).jobs).toHaveLength(2);clock=53000;expect((await read()).jobs).toHaveLength(0);
 });
+
+it('accepts metadata and inline downloads from youtube.com without www', async () => {
+ const {controller,saves}=await setup();const sender={...content,url:'https://youtube.com/watch?v=abcdefghijk'};
+ await expect(controller.handle({type:'VIDEO_CHANGED',payload:{videoId:'abcdefghijk',generation:1}},sender)).resolves.toEqual({accepted:true});
+ await expect(controller.handle({type:'VIDEO_METADATA',payload:pageEnvelope()},sender)).resolves.toEqual({accepted:true});
+ const current=(await controller.handle({type:'GET_SITE_VIEW'},sender)).video;
+ expect(current.videoId).toBe('abcdefghijk');
+ await controller.handle({type:'SITE_START_DOWNLOAD',payload:{choiceId:current.choices[0].id,videoId:current.videoId,generation:current.generation}},sender);
+ await completed(controller);expect(saves).toHaveLength(1);
+});

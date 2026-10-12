@@ -1,3 +1,4 @@
+import { isYouTubeUrl } from '../common/youtube-url.js';
 import { VideoPlaybackAbrRequest } from 'googlevideo/protos';
 import { u8ToBase64 } from 'googlevideo/utils';
 import { isMediaUrl } from '../common/messages.js';
@@ -22,10 +23,10 @@ export function createSabrSessionStore({ now = Date.now } = {}) {
     observe(details) {
       try {
         const origin = new URL(details.originUrl ?? details.initiator ?? details.documentUrl);
-        if (origin.origin !== 'https://www.youtube.com' || !Number.isInteger(details.tabId) || details.tabId < 0 ||
+        if (!isYouTubeUrl(origin) || !Number.isInteger(details.tabId) || details.tabId < 0 ||
             details.method !== 'POST' || !isMediaUrl(details.url) || new URL(details.url).pathname !== '/videoplayback') return false;
         const source = new URL(details.documentUrl ?? details.originUrl ?? details.initiator);
-        const sourceVideoId = source.origin === 'https://www.youtube.com' ? source.searchParams.get('v') : null;
+        const sourceVideoId = isYouTubeUrl(source) ? source.searchParams.get('v') : null;
         const chunks = (details.requestBody?.raw ?? []).map(p => p.bytes ? new Uint8Array(p.bytes) : null);
         if (chunks.some(c => !c)) return false;
         const length = chunks.reduce((n, c) => n + c.length, 0);

@@ -1,3 +1,4 @@
+import { isYouTubeUrl } from '../common/youtube-url.js';
 import { getExtensionApi, callApi, downloadBlob } from '../common/browser-api.js';
 import { createBackgroundController } from './controller.js';
 import { createBackgroundJobHost, createOffscreenOpener } from './job-host.js';
@@ -87,13 +88,13 @@ api.runtime.onMessage.addListener((message, sender, respond) => {
       return { session: await getSabrSession(message.payload.tabId, message.payload.videoId) };
     }
     if (message.type === 'INJECT_BRIDGE') {
-      if (sender.id !== api.runtime.id || sender.frameId !== 0 || !Number.isInteger(sender.tab?.id) || !/^https:\/\/www\.youtube\.com\//.test(sender.url ?? '')) throw new DownloadError('UNAUTHORIZED_MESSAGE', 'Недопустимый источник команды.');
+      if (sender.id !== api.runtime.id || sender.frameId !== 0 || !Number.isInteger(sender.tab?.id) || !isYouTubeUrl(sender.url)) throw new DownloadError('UNAUTHORIZED_MESSAGE', 'Недопустимый источник команды.');
       await callApi('scripting', 'executeScript', { target: { tabId: sender.tab.id }, world: 'MAIN', files: ['page-bridge.js'] });
       return { ready: true };
     }
     const siteView = message.type === 'GET_SITE_VIEW' && sender.id === api.runtime.id && sender.frameId === 0 && Number.isInteger(sender.tab?.id) && /^https?:\/\//.test(sender.url ?? '');
     if (siteView) await proxy.hydrate();
-    if ((message.type === 'GET_CURRENT_VIDEO' && sender.url === popupUrl && sender.id === api.runtime.id) || (siteView && /^https:\/\/www\.youtube\.com\//.test(sender.url))) {
+    if ((message.type === 'GET_CURRENT_VIDEO' && sender.url === popupUrl && sender.id === api.runtime.id) || (siteView && isYouTubeUrl(sender.url))) {
       const tabId = siteView ? sender.tab.id : message.payload.tabId;
       if (!siteView) await proxy.hydrate();
       try {

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createNavigationTracker } from '../../src/youtube/navigation.js';
+import { createNavigationTracker, videoIdFromUrl } from '../../src/youtube/navigation.js';
 afterEach(() => vi.useRealTimers());
 export function navigationEnvironment() {
   const events = new EventTarget();
@@ -27,4 +27,11 @@ it('rejects video IDs outside normal YouTube watch URLs', () => {
   const env = navigationEnvironment(); env.location.href = 'https://evil.test/watch?v=abcdefghijk';
   const tracker = createNavigationTracker({ env, onVideoChanged() {} });
   tracker.start(); expect(tracker.current().videoId).toBeNull(); tracker.stop();
+});
+
+it.each(['youtube.com', 'www.youtube.com'])('recognizes HTTPS watch pages on %s', host => {
+  expect(videoIdFromUrl(`https://${host}/watch?v=abcdefghijk`)).toBe('abcdefghijk');
+});
+it.each(['https://youtube.com.evil.test', 'https://m.youtube.com', 'http://youtube.com', 'https://youtube.com:8443'])('rejects unsupported origins %s', origin => {
+  expect(videoIdFromUrl(`${origin}/watch?v=abcdefghijk`)).toBeNull();
 });

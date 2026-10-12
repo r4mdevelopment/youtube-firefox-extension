@@ -1,3 +1,4 @@
+import { isYouTubeUrl } from '../common/youtube-url.js';
 import { parsePageMessage } from '../common/messages.js';
 import { DownloadError } from '../common/errors.js';
 import { normalizeRepresentations } from '../youtube/extractor.js';
@@ -25,7 +26,7 @@ export function createBackgroundController({ extensionId, popupUrl, downloadStre
     if (manager.list().some(j => !['complete','failed','cancelled'].includes(j.state))) widgetSettledAt = null;
     else if (widgetSettledAt === null) widgetSettledAt = now();
     persist(manager.list()); broadcast({ type: 'JOB_UPDATED', payload: job }); });
-  const contentSender = sender => sender.id === extensionId && sender.frameId === 0 && Number.isInteger(sender.tab?.id) && /^https:\/\/www\.youtube\.com\//.test(sender.url ?? '');
+  const contentSender = sender => sender.id === extensionId && sender.frameId === 0 && Number.isInteger(sender.tab?.id) && isYouTubeUrl(sender.url);
   const siteSender = sender => sender.id === extensionId && sender.frameId === 0 && Number.isInteger(sender.tab?.id) && /^https?:\/\//.test(sender.url ?? '');
   const popupSender = sender => sender.id === extensionId && sender.url === popupUrl && !sender.tab;
   const stateFor = tabId => tabs.get(tabId);

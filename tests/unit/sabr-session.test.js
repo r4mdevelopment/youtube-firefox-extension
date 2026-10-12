@@ -47,3 +47,9 @@ it.each(['/w==','/w','_w==','_w'])('matches equivalent Base64 player config %s',
  const store=createSabrSessionStore();store.setVideo(7,'abcdefghijk');const d=details();const request=VideoPlaybackAbrRequest.decode(body());request.videoPlaybackUstreamerConfig=new Uint8Array([255]);d.requestBody={raw:[{bytes:VideoPlaybackAbrRequest.encode(request).finish().buffer}]};store.observe(d);
  expect(store.get(7,'abcdefghijk',config)?.videoPlaybackUstreamerConfig).toBe('/w==');
 });
+
+it.each(['youtube.com', 'www.youtube.com'])('captures playback from %s', host => {
+ const store=createSabrSessionStore();store.setVideo(7,'abcdefghijk');
+ const d=details();d.originUrl=`https://${host}/watch?v=abcdefghijk`;
+ expect(store.observe(d)).toBe(true);expect(store.get(7,'abcdefghijk')).not.toBeNull();
+});
