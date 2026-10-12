@@ -1,6 +1,6 @@
 import { getExtensionApi, callApi, downloadBlob } from '../common/browser-api.js';
 import { createBackgroundController } from './controller.js';
-import { createBackgroundJobHost } from './job-host.js';
+import { createBackgroundJobHost, createOffscreenOpener } from './job-host.js';
 import { downloadStream } from '../download/stream-downloader.js';
 import { downloadSabr } from '../download/sabr-downloader.js';
 import { muxMp4 } from '../mux/muxer.js';
@@ -19,22 +19,23 @@ async function getSabrSession(tabId, videoId) {
   return session;
 }
 const popupUrl = api.runtime.getURL('popup/popup.html');
-const runnerUrl = api.runtime.getURL('runner/runner.html');
+const runnerUrl = api.runtime.getURL('offscreen/offscreen.html');
+const openOffscreen = createOffscreenOpener(api);
 let proxy;
-const isRunner = sender => !persistent && sender.id === api.runtime.id && sender.url === runnerUrl;
+const isRunner = sender => !persistent && sender.id === api.runtime.id && sender.url === runnerUrl && !sender.tab;
 async function metadata(tabId, refresh = false) {
   const result = await callApi('tabs', 'sendMessage', tabId, { type: refresh ? 'REFRESH_STREAMS' : 'GET_CURRENT_METADATA' });
   if (result?.error) throw new DownloadError(result.error.code, result.error.message);
   return result;
 }
 async function openRunner() {
-  await callApi('tabs', 'create', { url: runnerUrl, active: false });
+  await openOffscreen();
   for (let n = 0; n < 100; n++) {
     const state = await callApi('runtime', 'sendMessage', { type: 'RUNNER_STATE' }).catch(() => null);
     if (state?.jobs) return;
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  throw new DownloadError('RUNNER_UNAVAILABLE', 'Не удалось открыть страницу загрузки.');
+  throw new DownloadError('RUNNER_UNAVAILABLE', 'Не удалось запустить скрытую обработку загрузки.');
 }
 let lastBroadcast = 0;
 let persistTimer; let pendingSnapshots; let writeQueue = Promise.resolve();
@@ -59,7 +60,25 @@ const ready = callApi('storage.local', 'get', 'jobs').catch(() => ({ jobs: [] })
 api.runtime.onMessage.addListener((message, sender, respond) => {
   if (!message?.type || message.type.startsWith('RUNNER_') || message.type === 'JOB_UPDATED' && !isRunner(sender)) return false;
   const execute = async () => {
+    if (['SAVE_BLOB', 'SAVE_STATUS', 'CANCEL_SAVE'].includes(message.type)) {
+      if (!isRunner(sender)) throw new DownloadError('UNAUTHORIZED_MESSAGE', 'Недопустимый источник сохранения.');
+      const p = message.payload ?? {}; const prefix = `blob:${api.runtime.getURL('')}`;
+      if (message.type === 'SAVE_BLOB') {
+        if (typeof p.url !== 'string' || !p.url.startsWith(prefix) || typeof p.filename !== 'string' || !p.filename.endsWith('.mp4') || /[\\/]/.test(p.filename))
+          throw new DownloadError('INVALID_MESSAGE', 'Некорректные данные сохранения.');
+        return { downloadId: await callApi('downloads', 'download', { url: p.url, filename: p.filename, saveAs: p.saveAs !== false, conflictAction: 'uniquify' }) };
+      }
+      if (!Number.isInteger(p.downloadId)) throw new DownloadError('INVALID_MESSAGE', 'Некорректная загрузка.');
+      const [item] = await callApi('downloads', 'search', { id: p.downloadId });
+      if (!item?.url?.startsWith(prefix)) throw new DownloadError('INVALID_MESSAGE', 'Загрузка не принадлежит расширению.');
+      if (message.type === 'CANCEL_SAVE') { await callApi('downloads', 'cancel', p.downloadId); return { cancelled: true }; }
+      return { state: item.state };
+    }
     const controller = await ready;
+    if (message.type === 'MEDIA_HEARTBEAT') {
+      if (!isRunner(sender)) throw new DownloadError('UNAUTHORIZED_MESSAGE', 'Недопустимый источник команды.');
+      await proxy.hydrate(); return { ready: true };
+    }
     if (message.type === 'JOB_UPDATED' && isRunner(sender)) { proxy.accept(message.payload); return { accepted: true }; }
     if (message.type === 'REFRESH_JOB_STREAMS' && isRunner(sender)) return metadata(message.payload.tabId, true);
     if (message.type === 'GET_SABR_SESSION') {

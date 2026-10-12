@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "YouTube MP4 Downloader",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Download available MP4 streams without re-encoding.",
   "permissions": [
     "downloads",
     "scripting",
     "storage",
-    "webRequest"
+    "webRequest",
+    "offscreen"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
@@ -42,5 +43,6 @@
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "YouTube MP4 Downloader"
-  }
+  },
+  "minimum_chrome_version": "116"
 }
