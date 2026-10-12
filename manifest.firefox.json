@@ -1,0 +1,58 @@
+{
+  "manifest_version": 2,
+  "name": "YouTube MP4 Downloader",
+  "version": "0.1.7",
+  "description": "Download available MP4 streams without re-encoding.",
+  "permissions": [
+    "downloads",
+    "scripting",
+    "storage",
+    "webRequest",
+    "https://www.youtube.com/*",
+    "https://*.googlevideo.com/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "site-ui.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "youtube-mp4-downloader@local.invalid",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "browser_action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "YouTube MP4 Downloader"
+  }
+}

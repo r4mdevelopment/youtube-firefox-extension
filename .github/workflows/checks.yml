@@ -1,0 +1,29 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Tests
+        run: npm test
+      - name: Firefox build
+        run: npm run build:firefox
+      - name: Chromium build
+        run: npm run build:chromium
+      - name: Firefox lint
+        run: npm run lint:firefox
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-builds
+          path: dist/

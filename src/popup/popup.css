@@ -1,0 +1,12 @@
+body { width: 360px; margin: 0; background: #f8f9fc; color: #172033; font: 14px/1.5 system-ui, sans-serif; }
+main { padding: 20px; }
+h1 { font-size: 18px; margin: 0 0 16px; }
+h2 { font-size: 15px; overflow-wrap: anywhere; }
+select { display: block; width: 100%; margin: 8px 0 16px; padding: 8px; }
+button { border: 0; border-radius: 6px; padding: 10px 16px; background: #275de8; color: white; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+[hidden] { display: none !important; }
+#cancel { background: #596275; }
+#error { color: #a31d30; overflow-wrap: anywhere; }
+progress { display: block; width: 100%; margin-top: 4px; accent-color: #275de8; }

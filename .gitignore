@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.superpowers/
+web-ext-artifacts/
+.npm-cache/
+artifacts/
+
+# Local project notes
+docs/
+2026-10-11-youtube-downloader-extension.md
+2026-10-11-youtube-downloader-extension-design.md
