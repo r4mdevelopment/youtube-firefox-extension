@@ -2,7 +2,7 @@
 
 Firefox-first расширение для скачивания доступных видео YouTube в MP4. Работает внутри браузера: отдельное приложение и установленный FFmpeg не нужны.
 
-**Chromium: 0.1.9. Подписанная Firefox-сборка: 0.1.7.** [Скачать сборки из Releases](https://github.com/r4mdevelopment/youtube-firefox-extension/releases/latest).
+**Chromium: 0.1.10. Подписанная Firefox-сборка: 0.1.7.** [Скачать сборки из Releases](https://github.com/r4mdevelopment/youtube-firefox-extension/releases/latest).
 
 ## Возможности
 
@@ -65,7 +65,7 @@ Firefox-first расширение для скачивания доступны�
 
 ## Chromium
 
-Скачайте и распакуйте `youtube-mp4-downloader-chromium-0.1.9.zip` из Releases. В `chrome://extensions` или `edge://extensions` включите режим разработчика и выберите **«Загрузить распакованное расширение»**.
+Скачайте и распакуйте `youtube-mp4-downloader-chromium-0.1.10.zip` из Releases. В `chrome://extensions` или `edge://extensions` включите режим разработчика и выберите **«Загрузить распакованное расширение»**.
 
 Chromium-сборка использует Manifest V3 и Offscreen API (Chromium 116 или новее). Загрузка и объединение продолжаются в скрытом документе после закрытия меню расширения. Браузер нужно оставить запущенным до завершения сохранения.
 

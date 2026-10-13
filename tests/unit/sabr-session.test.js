@@ -53,3 +53,12 @@ it.each(['youtube.com', 'www.youtube.com'])('captures playback from %s', host =>
  const d=details();d.originUrl=`https://${host}/watch?v=abcdefghijk`;
  expect(store.observe(d)).toBe(true);expect(store.get(7,'abcdefghijk')).not.toBeNull();
 });
+
+it('restores only the original lifetime and does not re-cache restored proof',()=>{
+ let clock=0;let packet;const store=createSabrSessionStore({now:()=>clock,onCapture:value=>{packet=value;}});
+ store.setVideo(7,'abcdefghijk');store.observe(details());expect(packet.request.capturedAt).toBe(0);
+ clock=599999;const recovered=createSabrSessionStore({now:()=>clock,onCapture:()=>{throw new Error('must not re-cache');}});recovered.setVideo(7,'abcdefghijk');
+ expect(recovered.observe(details(),{notify:false,capturedAt:packet.request.capturedAt})).toBe(true);
+ expect(recovered.get(7,'abcdefghijk')).not.toBeNull();clock=600001;expect(recovered.get(7,'abcdefghijk')).toBeNull();
+ expect(recovered.observe(details(),{notify:false,capturedAt:0})).toBe(false);
+});

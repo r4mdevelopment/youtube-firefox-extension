@@ -77,6 +77,13 @@ try{
   report.pageUrl=await evaluate(page.sessionId,'location.href');
   if(process.env.METADATA_ONLY==='1'){report.success=true;console.log(JSON.stringify(report));}else{
   await sleep(6000);report.playback=await evaluate(page.sessionId,"(()=>{const v=document.querySelector('video');return{paused:v.paused,currentTime:v.currentTime,readyState:v.readyState};})()");
+  if(process.env.RESTART_BEFORE_DOWNLOAD==='1'){
+   let versions=[];c.listeners.push(m=>{if(m.sessionId===page.sessionId&&m.method==='ServiceWorker.workerVersionUpdated')versions.push(...m.params.versions);});
+   await c.send('ServiceWorker.enable',{},page.sessionId);const version=await until(()=>versions.find(v=>v.scriptURL===worker.url));
+   await c.send('Target.detachFromTarget',{sessionId:workerSession});await c.send('ServiceWorker.stopWorker',{versionId:version.versionId},page.sessionId);
+   const restarted=await until(async()=>{const targets=(await c.send('Target.getTargets')).targetInfos;return targets.find(t=>t.type==='service_worker'&&t.url===worker.url&&t.targetId!==worker.targetId);});workerSession=await c.attach(restarted.targetId);
+   report.workerRestartBeforeDownload=true;
+  }
   const selected=quality?`[...document.querySelector('#ytdl-quality-host').shadowRoot.querySelectorAll('.quality')].find(e=>e.textContent.startsWith('${quality}p'))`:"document.querySelector('#ytdl-quality-host').shadowRoot.querySelector('.quality')";await click(page,selected);
   await sleep(1200);report.initialJobs=(await inspect()).jobs.map(j=>({state:j.state,error:j.error}));report.inlineStatus=await evaluate(page.sessionId,"document.querySelector('#ytdl-quality-host').shadowRoot.querySelector('[role=status]').textContent");console.log(JSON.stringify({playback:report.playback,jobs:report.initialJobs,inlineStatus:report.inlineStatus}));
   assert(report.initialJobs.length,report.inlineStatus);

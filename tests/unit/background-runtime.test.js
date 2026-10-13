@@ -45,3 +45,26 @@ it('rejects save requests from tabs, popup and foreign blob origins', async () =
   expect(h.getOptions()).toBeUndefined();
  } finally {vi.unstubAllGlobals();vi.resetModules();}
 });
+
+it('recovers a validated page-held capture after the service worker restarts', async()=>{
+ let listener,observe,cached;const id='test@local',base='chrome-extension://test/';
+ const api={runtime:{id,getManifest:()=>({manifest_version:3}),getURL:path=>base+path,onMessage:{addListener:fn=>{listener=fn;}},sendMessage:async()=>({})},
+ storage:{local:{get:async()=>({jobs:[]}),set:async()=>{}}},tabs:{onRemoved:{addListener(){}},sendMessage:async(_tab,message)=>{
+  if(message.type==='CACHE_PLAYBACK_REQUEST'){cached=message.payload;return {cached:true};}
+  if(message.type==='GET_PLAYBACK_REQUEST')return {request:cached?.config===message.payload.config?cached.request:null};
+  return {state:{videoId:'abcdefghijk'},metadata:{payload:{sabrConfig:'AQID'}}};
+ }},webRequest:{onBeforeRequest:{addListener:fn=>{observe=fn;}}}};
+ vi.stubGlobal('browser',api);vi.resetModules();
+ try{
+  await import('../../src/background/background.js');
+  const bytes=VideoPlaybackAbrRequest.encode({...VideoPlaybackAbrRequest.decode(new Uint8Array()),videoPlaybackUstreamerConfig:new Uint8Array([1,2,3]),streamerContext:{...StreamerContext.decode(new Uint8Array()),clientInfo:{clientName:1}}}).finish();
+  observe({tabId:7,method:'POST',url:'https://r1.googlevideo.com/videoplayback',initiator:'https://www.youtube.com',requestBody:{raw:[{bytes:bytes.buffer}]}});
+  await vi.waitFor(()=>expect(cached).toBeDefined());
+  vi.resetModules();await import('../../src/background/background.js');
+  const send=(message,sender)=>new Promise(resolve=>{if(listener(message,sender,resolve)===false)resolve({ignored:true});});
+  const runner={id,url:base+'offscreen/offscreen.html'};
+  await send({type:'JOB_UPDATED',payload:{id:'running',videoId:'abcdefghijk',tabId:7,state:'downloading'}},runner);
+  const result=await send({type:'GET_SABR_SESSION',payload:{videoId:'abcdefghijk',tabId:7}},runner);
+  expect(result.error).toBeUndefined();expect(result.session).toMatchObject({videoPlaybackUstreamerConfig:'AQID'});
+ }finally{vi.unstubAllGlobals();vi.resetModules();}
+});

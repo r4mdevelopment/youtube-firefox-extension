@@ -9,7 +9,7 @@ function canonicalConfig(value) {
 }
 
 // Opaque playback proof belongs only to this tab/video and lives in memory.
-export function createSabrSessionStore({ now = Date.now } = {}) {
+export function createSabrSessionStore({ now = Date.now, onCapture = () => {} } = {}) {
   const videos = new Map(); const sessions = new Map(); const pending = new Map(); const configurations = new Map();
   return {
     setVideo(tabId, videoId) {
@@ -20,8 +20,9 @@ export function createSabrSessionStore({ now = Date.now } = {}) {
       if (next) { sessions.set(tabId, next); pending.get(tabId).delete(videoId); }
     },
     forgetTab(tabId) { videos.delete(tabId); sessions.delete(tabId); pending.delete(tabId); configurations.delete(tabId); },
-    observe(details) {
+    observe(details, { notify = true, capturedAt = now() } = {}) {
       try {
+        if (!Number.isFinite(capturedAt) || capturedAt > now() || now() - capturedAt > 600000) return false;
         const origin = new URL(details.originUrl ?? details.initiator ?? details.documentUrl);
         if (!isYouTubeUrl(origin) || !Number.isInteger(details.tabId) || details.tabId < 0 ||
             details.method !== 'POST' || !isMediaUrl(details.url) || new URL(details.url).pathname !== '/videoplayback') return false;
@@ -36,7 +37,7 @@ export function createSabrSessionStore({ now = Date.now } = {}) {
         const request = VideoPlaybackAbrRequest.decode(bytes);
         const ctx = request.streamerContext;
         if (!request.videoPlaybackUstreamerConfig?.length || !ctx?.clientInfo) return false;
-        const capture = { videoId: sourceVideoId ?? videos.get(details.tabId), createdAt: now(),
+        const capture = { videoId: sourceVideoId ?? videos.get(details.tabId), createdAt: capturedAt,
           data: { url: details.url, videoPlaybackUstreamerConfig: u8ToBase64(request.videoPlaybackUstreamerConfig),
             clientInfo: ctx.clientInfo, poToken: ctx.poToken?.length ? u8ToBase64(ctx.poToken) : undefined } };
         const candidatesByConfig = configurations.get(details.tabId) ?? new Map();
@@ -50,6 +51,9 @@ export function createSabrSessionStore({ now = Date.now } = {}) {
           while (candidates.size > 2) candidates.delete(candidates.keys().next().value);
           pending.set(details.tabId, candidates);
         } else sessions.set(details.tabId, capture);
+        if (notify) onCapture({ tabId: details.tabId, config: capture.data.videoPlaybackUstreamerConfig,
+          request: { capturedAt, method: details.method, url: details.url, originUrl: details.originUrl, initiator: details.initiator,
+            documentUrl: details.documentUrl, chunks: chunks.map(chunk => Array.from(chunk)) } });
         return true;
       } catch { return false; }
     },

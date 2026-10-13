@@ -10,12 +10,25 @@ import { createSabrSessionStore } from '../youtube/sabr-session.js';
 const api = getExtensionApi();
 const manifest = api.runtime.getManifest();
 const persistent = manifest.manifest_version === 2 && manifest.background?.persistent === true;
-const sabrSessions = createSabrSessionStore();
+const sabrSessions = createSabrSessionStore({ onCapture: ({ tabId, config, request }) => {
+  callApi('tabs', 'sendMessage', tabId, { type: 'CACHE_PLAYBACK_REQUEST', payload: { config, request } }).catch(() => {});
+} });
 api.webRequest.onBeforeRequest.addListener(details => { sabrSessions.observe(details); }, { urls: ['https://*.googlevideo.com/videoplayback*'] }, ['requestBody']);
 async function getSabrSession(tabId, videoId) {
   const current = await metadata(tabId);
   if (current.state?.videoId !== videoId) throw new DownloadError('STALE_VIDEO', 'Ролик изменился. Обновите список форматов.');
-  const session = sabrSessions.get(tabId, videoId, current.metadata?.payload?.sabrConfig);
+  const config = current.metadata?.payload?.sabrConfig;
+  let session = sabrSessions.get(tabId, videoId, config);
+  if (!session && config) {
+    const cached = await callApi('tabs', 'sendMessage', tabId, { type: 'GET_PLAYBACK_REQUEST', payload: { config } }).catch(() => null);
+    // Re-validate the cached wire request before restoring any proof into this worker.
+    const request = cached?.request;
+    if (request && Array.isArray(request.chunks) && request.chunks.reduce((n, chunk) => n + (Array.isArray(chunk) ? chunk.length : 262145), 0) <= 262144) {
+      sabrSessions.setVideo(tabId, videoId);
+      sabrSessions.observe({ ...request, tabId, requestBody: { raw: request.chunks.map(chunk => ({ bytes: new Uint8Array(chunk).buffer })) } }, { notify: false, capturedAt: request.capturedAt });
+      session = sabrSessions.get(tabId, videoId, config);
+    }
+  }
   if (!session) throw new DownloadError('SABR_SESSION_REQUIRED', 'Запустите видео на странице YouTube, затем повторите загрузку.');
   return session;
 }
@@ -93,10 +106,11 @@ api.runtime.onMessage.addListener((message, sender, respond) => {
       return { ready: true };
     }
     const siteView = message.type === 'GET_SITE_VIEW' && sender.id === api.runtime.id && sender.frameId === 0 && Number.isInteger(sender.tab?.id) && /^https?:\/\//.test(sender.url ?? '');
-    if (siteView) await proxy.hydrate();
-    if ((message.type === 'GET_CURRENT_VIDEO' && sender.url === popupUrl && sender.id === api.runtime.id) || (siteView && isYouTubeUrl(sender.url))) {
-      const tabId = siteView ? sender.tab.id : message.payload.tabId;
-      if (!siteView) await proxy.hydrate();
+    const inlineStart = message.type === 'SITE_START_DOWNLOAD' && sender.id === api.runtime.id && sender.frameId === 0 && Number.isInteger(sender.tab?.id) && isYouTubeUrl(sender.url);
+    if (siteView || inlineStart) await proxy.hydrate();
+    if ((message.type === 'GET_CURRENT_VIDEO' && sender.url === popupUrl && sender.id === api.runtime.id) || ((siteView || inlineStart) && isYouTubeUrl(sender.url))) {
+      const tabId = siteView || inlineStart ? sender.tab.id : message.payload.tabId;
+      if (!siteView && !inlineStart) await proxy.hydrate();
       try {
         const current = await metadata(tabId);
         if (current?.state) {

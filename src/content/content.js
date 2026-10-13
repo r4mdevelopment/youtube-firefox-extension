@@ -1,3 +1,4 @@
+import { createPlaybackCache } from './playback-cache.js';
 import { callApi, getExtensionApi } from '../common/browser-api.js';
 import { parsePageMessage, makeExtensionMessage, YTDL_PAGE_BRIDGE_REQUEST } from '../common/messages.js';
 import { createNavigationTracker } from '../youtube/navigation.js';
@@ -14,6 +15,7 @@ export async function forwardPageMessage(value, send = message => callApi('runti
 }
 
 if (typeof window !== 'undefined') {
+  const playbackCache = createPlaybackCache();
   let requestTimer;
   const documentToken = crypto.randomUUID();
   let received = null;
@@ -44,6 +46,12 @@ if (typeof window !== 'undefined') {
   const api = getExtensionApi();
   api.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== api.runtime.id) return false;
+    if (message?.type === 'CACHE_PLAYBACK_REQUEST' || message?.type === 'GET_PLAYBACK_REQUEST') {
+      if (sender.tab) return false;
+      if (message.type === 'CACHE_PLAYBACK_REQUEST') { playbackCache.put(message.payload); respond({ cached: true }); }
+      else respond({ request: playbackCache.get(message.payload?.config) });
+      return false;
+    }
     if (message?.type === 'GET_CURRENT_METADATA') {
       const state = { ...tracker.current(), documentToken };
       respond({ state, metadata: received }); return false;
