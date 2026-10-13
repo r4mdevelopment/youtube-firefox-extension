@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "YouTube MP4 Downloader",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Download available MP4 streams without re-encoding.",
   "permissions": [
     "downloads",
@@ -50,7 +50,8 @@
         "required": [
           "none"
         ]
-      }
+      },
+      "update_url": "https://raw.githubusercontent.com/r4mdevelopment/youtube-firefox-extension/main/updates/firefox.json"
     }
   },
   "browser_action": {

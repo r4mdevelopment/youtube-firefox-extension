@@ -1,6 +1,6 @@
 {
   "name": "youtube-firefox-extension",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,10 +10,12 @@
     "test": "vitest run",
     "build:firefox": "node esbuild.config.mjs firefox",
     "build:chromium": "node esbuild.config.mjs chromium",
-    "lint:firefox": "web-ext lint --source-dir dist/firefox"
+    "lint:firefox": "web-ext lint --source-dir dist/firefox --self-hosted",
+    "update:firefox": "node scripts/firefox-update.mjs"
   },
   "devDependencies": {
     "@ffmpeg-installer/win32-x64": "^4.1.0",
+    "adm-zip": "^0.6.1",
     "esbuild": "^0.28.2",
     "jsdom": "^30.1.2",
     "vitest": "^5.0.3",
