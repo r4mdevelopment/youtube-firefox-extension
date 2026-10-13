@@ -74,6 +74,7 @@ try:
   if state['jobs'][-1]['state'] in ['complete','failed','cancelled']:break
   time.sleep(.1)
  result['complete']=state;assert state['jobs'][-1]['state']=='complete',str(state)
+ assert state['stats']['failedDialogs']==1;result['saveDialogFallback']=True
  saved=next(d for d in state['downloads']if d['id']==state['jobs'][-1]['downloadId'])
  path=Path(saved['filename']);assert path.is_relative_to(DOWNLOADS) and path.exists();result['savedBytes']=path.stat().st_size;result['sha256']=hashlib.sha256(path.read_bytes()).hexdigest()
  decode=subprocess.run([str(ROOT/'node_modules/@ffmpeg-installer/win32-x64/ffmpeg.exe'),'-v','error','-i',str(path),'-f','null','-'],capture_output=True,text=True)

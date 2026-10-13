@@ -46,6 +46,14 @@ export async function downloadBlob({ blob, filename, saveAs = true, signal }) {
       api.downloads.onChanged.addListener(changed);
       signal?.addEventListener('abort', abort, { once: true });
       callApi('downloads', 'download', { url, filename, saveAs, conflictAction: 'uniquify' })
+        .catch(error => {
+          checkAbort(signal);
+          // Some Firefox profiles fail before opening the native Save As dialog.
+          // Reuse this live blob and let the browser save to its configured folder.
+          if (globalThis.browser && saveAs === true && /^An unexpected error occurred\.?$/i.test(error?.message ?? ''))
+            return callApi('downloads', 'download', { url, filename, saveAs: false, conflictAction: 'uniquify' });
+          throw error;
+        })
         .then(async downloadId => {
           id = downloadId;
           if (signal?.aborted) { abort(); return; }

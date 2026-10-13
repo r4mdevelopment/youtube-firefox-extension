@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube MP4 Downloader",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Download available MP4 streams without re-encoding.",
   "permissions": [
     "downloads",

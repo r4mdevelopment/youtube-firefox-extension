@@ -2,11 +2,14 @@
 const originalFetch = globalThis.fetch.bind(globalThis);
 const originalSend = browser.tabs.sendMessage.bind(browser.tabs);
 const originalDownload = browser.downloads.download.bind(browser.downloads);
-const stats = {createdTabs:0, backgroundPath:location.pathname, requests:0, mode:'complete'};
+const stats = {createdTabs:0, backgroundPath:location.pathname, requests:0, mode:'complete',failedDialogs:0};
 let parallelReleased=false;const waiting=[];
 const realCreate = browser.tabs.create.bind(browser.tabs);
 browser.tabs.create = options => { stats.createdTabs++; return realCreate(options); };
-browser.downloads.download = options => originalDownload({...options,saveAs:false});
+browser.downloads.download = options => {
+  if (options.saveAs === true) { stats.failedDialogs++; return Promise.reject(new Error('An unexpected error occurred')); }
+  return originalDownload(options);
+};
 const read = async name => (await originalFetch(browser.runtime.getURL('probe/'+name))).blob();
 const media = Promise.all([read('background-video.mp4'),read('background-audio.mp4')]);
 globalThis.fetch = async (url,options) => {
