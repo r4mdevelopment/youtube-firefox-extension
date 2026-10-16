@@ -71,3 +71,32 @@ it('preserves unknown sizes and avoids NaN', () => {
   const raw = { ...progressive, formats: progressive.formats.map(({ contentLength, ...f }) => f) };
   expect(choices(raw)[0].estimatedBytes).toBeNull();
 });
+
+it('offers YouTube quality labels for cropped SABR frames while preserving encoded heights', () => {
+  // Public metadata from 2jIY_fmljvQ: the codec-compatible tracks are slightly cropped.
+  const tracks = [
+    [299, 1072, '1080p60', 60], [298, 714, '720p60', 60], [136, 714, '720p', 30],
+    [135, 476, '480p', 30], [134, 358, '360p', 30], [133, 238, '240p', 30], [160, 142, '144p', 30],
+  ];
+  const raw = { transport: 'SABR', adaptiveFormats: [
+    ...tracks.map(([itag, height, qualityLabel, fps]) => ({ itag, height, qualityLabel, fps,
+      mimeType: 'video/mp4; codecs="avc1.64002A"', lastModified: '123' })),
+    { itag: 140, mimeType: 'audio/mp4; codecs="mp4a.40.2"', lastModified: '123' },
+  ] };
+  expect(choices(raw).map(c => [c.height, c.video.height, c.fps, c.audio.itag])).toEqual([
+    [1080, 1072, 60, 140], [720, 714, 60, 140], [720, 714, 30, 140],
+    [480, 476, 30, 140], [360, 358, 30, 140], [240, 238, 30, 140], [144, 142, 30, 140],
+  ]);
+});
+it('does not turn invalid frame dimensions into a quality using its label', () => {
+  for (const height of [0, -1, 1072.5]) {
+    const raw = { ...progressive, formats: progressive.formats.map(f => ({ ...f, height, qualityLabel: '1080p' })) };
+    expect(choices(raw)).toEqual([]);
+  }
+});
+it('does not infer a cropped quality from malformed labels or an itag', () => {
+  for (const qualityLabel of [undefined, '1080p<script>', '1080', '2160p']) {
+    const raw = { ...progressive, formats: progressive.formats.map(f => ({ ...f, height: 1072, qualityLabel })) };
+    expect(choices(raw)).toEqual([]);
+  }
+});
