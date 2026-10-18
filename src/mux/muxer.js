@@ -1,5 +1,6 @@
-import { Input, ALL_FORMATS, BlobSource, EncodedPacketSink, EncodedVideoPacketSource, EncodedAudioPacketSource, Output, Mp4OutputFormat, AppendOnlyStreamTarget } from 'mediabunny';
+import { Input, ALL_FORMATS, BlobSource, EncodedPacketSink, EncodedVideoPacketSource, EncodedAudioPacketSource, Output, Mp4OutputFormat, StreamTarget } from 'mediabunny';
 import { DownloadError, checkAbort } from '../common/errors.js';
+import { createBlobWriter } from './blob-writer.js';
 
 // A posted task lets cancellation/UI run without inactive-tab timer clamping.
 function yieldToTask(signal) {
@@ -21,7 +22,7 @@ function yieldToTask(signal) {
 
 export async function muxMp4({ videoBlob, audioBlob, signal, onProgress = () => {} }) {
   checkAbort(signal);
-  const inputs = []; const chunks = [];
+  const inputs = []; const writer = createBlobWriter();
   let output;
   try {
     const videoInput = new Input({ source: new BlobSource(videoBlob), formats: ALL_FORMATS }); inputs.push(videoInput);
@@ -33,8 +34,12 @@ export async function muxMp4({ videoBlob, audioBlob, signal, onProgress = () => 
     if (!videoConfig || !audioConfig) throw new DownloadError('MUX_UNSUPPORTED_CODEC', 'Отсутствует конфигурация дорожек.');
     checkAbort(signal);
     const videoSource = new EncodedVideoPacketSource('avc'); const audioSource = new EncodedAudioPacketSource('aac');
-    output = new Output({ format: new Mp4OutputFormat({ fastStart: 'fragmented', minimumFragmentDuration: 2 }),
-      target: new AppendOnlyStreamTarget(new WritableStream({ write(chunk) { checkAbort(signal); chunks.push(new Blob([chunk])); } })) });
+    // Standalone hardware players often cannot read fragmented MP4. Keep normal sample tables.
+    output = new Output({ format: new Mp4OutputFormat({ fastStart: false }),
+      target: new StreamTarget(new WritableStream({ write({ data, position }) {
+        checkAbort(signal);
+        writer.write(data, position);
+      } }), { chunked: true, chunkSize: 4 * 1024 * 1024 }) });
     output.addVideoTrack(videoSource, { rotation: await video.getRotation() }); output.addAudioTrack(audioSource);
     await output.start();
     const streams = [
@@ -60,7 +65,7 @@ export async function muxMp4({ videoBlob, audioBlob, signal, onProgress = () => 
     if (streams.some(s => !s.count)) throw new DownloadError('MUX_FAILED', 'Одна из дорожек не содержит медиаданных.');
     videoSource.close(); audioSource.close(); checkAbort(signal);
     await output.finalize(); checkAbort(signal);
-    const result = new Blob(chunks, { type: 'video/mp4' });
+    const result = writer.finish();
     if (!result.size) throw new DownloadError('MUX_FAILED', 'Получен пустой MP4.');
     onProgress(1); checkAbort(signal); return result;
   } catch (error) {
@@ -69,6 +74,6 @@ export async function muxMp4({ videoBlob, audioBlob, signal, onProgress = () => 
     if (error instanceof DownloadError) throw error;
     throw new DownloadError('MUX_FAILED', 'Не удалось прочитать или объединить медиадорожки.');
   } finally {
-    for (const input of inputs) input.dispose(); chunks.length = 0;
+    for (const input of inputs) input.dispose(); writer.clear();
   }
 }

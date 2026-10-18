@@ -4,6 +4,22 @@ import { Input, ALL_FORMATS, BlobSource, EncodedPacketSink } from 'mediabunny';
 import { muxMp4 } from '../../src/mux/muxer.js';
 const fixture = async name => new Blob([await readFile(new URL(`../fixtures/${name}`, import.meta.url))]);
 const open = blob => new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+it('writes a conventional MP4 for standalone players', async () => {
+  const output = await muxMp4({ videoBlob: await fixture('background-video.mp4'), audioBlob: await fixture('background-audio.mp4') });
+  const bytes = new Uint8Array(await output.arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  const boxes = [];
+  for (let offset = 0; offset < bytes.length;) {
+    const size = view.getUint32(offset);
+    expect(size).toBeGreaterThanOrEqual(8);
+    boxes.push(new TextDecoder().decode(bytes.subarray(offset + 4, offset + 8)));
+    offset += size;
+    expect(offset).toBeLessThanOrEqual(bytes.length);
+  }
+  expect(boxes).toContain('moov');
+  expect(boxes.filter(type => type === 'mdat')).toHaveLength(1);
+  expect(boxes).not.toContain('moof');
+});
 it('rejects incompatible actual codecs before starting output', async () => {
   await expect(muxMp4({ videoBlob: await fixture('unsupported.webm'), audioBlob: await fixture('audio-only.mp4') })).rejects.toMatchObject({ code: 'MUX_UNSUPPORTED_CODEC' });
 });
