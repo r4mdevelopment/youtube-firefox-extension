@@ -1,7 +1,18 @@
 {
   "addons": {
     "youtube-mp4-downloader@local.invalid": {
-      "updates": []
+      "updates": [
+        {
+          "version": "0.1.14",
+          "update_link": "https://github.com/r4mdevelopment/youtube-firefox-extension/releases/download/v0.1.14/youtube-mp4-downloader-firefox-0.1.14.xpi",
+          "update_hash": "sha256:d6f3130d98a52d237f5261da7a0aaf775537fba9c1681d700c9f0f2cfc92acaa",
+          "applications": {
+            "gecko": {
+              "strict_min_version": "142.0"
+            }
+          }
+        }
+      ]
     }
   }
 }
